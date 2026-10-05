@@ -36,6 +36,16 @@ pnpm install --frozen-lockfile
 pnpm test
 ```
 
+### GitHub 自动构建与正式发行
+
+提交到 `main` 后，GitHub Actions 自动运行 Android 测试、Lint、发行版编译和 Worker 本地测试。全部通过后，用固定发行证书签名 arm64-v8a 与 universal 两个安装包；在 Actions 对应运行的 `installable-apks-*` 下载，保存 90 天。PR 和其他分支只运行检查，不使用发行密钥。
+
+维护者须先在仓库 Actions Secrets 配置 `MEDICINE_RELEASE_KEYSTORE_BASE64`（既有 PKCS12 发行证书的 Base64）与 `MEDICINE_RELEASE_STORE_PASSWORD`（证书密码）。请保管原证书，不要重新生成或提交它；缺少认证、证书指纹错误或校验失败时，工作流停止，不生成临时签名发行包。
+
+正式发布从 `v1.0.0` 开始，按 `v1.0.0 → … → v1.0.9 → v1.1.0` 进位；Android 内部 `versionCode` 持续递增。推送与 APK 版本一致的 `vX.Y.Z` 标签后，同样经过检查、签名和校验，再将安装包、SHA-256 校验值及构建信息发布到 [Releases](https://github.com/1115yt/medicine-cabinet/releases) 长期保存。标签对应提交必须在 `main` 历史内；已有版本的安装包不会自动覆盖。
+
+正式发行只提供固定签名的发行包。原预览版使用不同签名，切换前先导出药箱备份；同签名发行包之间可覆盖升级。Actions 工件与 Releases 附件均不包含发行私钥或密码。
+
 ## 资料来源与许可证
 
 客户端内置条码资料根据 [EricLiuCN/barcode](https://github.com/EricLiuCN/barcode) 项目的 2023-09-07 数据快照整理。感谢上游项目维护者与贡献者收集、整理并分享资料。详见 [资料说明](CATALOG.md)。
