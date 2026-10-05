@@ -1,0 +1,13 @@
+{
+  "name": "medicine-cabinet-catalog",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "dev": "wrangler dev --local",
+    "check": "wrangler deploy --dry-run --outdir ../.local/cloudflare-bundle"
+  },
+  "devDependencies": {
+    "wrangler": "4.147.0"
+  }
+}
