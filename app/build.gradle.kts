@@ -79,9 +79,15 @@ android {
     testOptions {
         unitTests.isIncludeAndroidResources = true
         unitTests.all {
+            val testHome = rootProject.file(".local/test-home")
             it.systemProperty("robolectric.dependency.repo.url", "https://repo.maven.apache.org/maven2")
             // 模拟器下载锁与运行时缓存始终落在项目内，避免写入盘根或全局用户目录。
-            it.systemProperty("user.home", rootProject.file(".local/test-home").absolutePath)
+            it.doFirst {
+                check(testHome.isDirectory || testHome.mkdirs()) {
+                    "无法创建项目测试缓存目录：${testHome.absolutePath}"
+                }
+            }
+            it.systemProperty("user.home", testHome.absolutePath)
             it.systemProperty("maven.repo.local", rootProject.file(".local/test-home/.m2/repository").absolutePath)
         }
     }

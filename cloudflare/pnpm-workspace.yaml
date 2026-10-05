@@ -1,3 +1,6 @@
+packages:
+  - '.'
+
 # 仅允许本项目所需的官方本地构建工具安装脚本。
 allowBuilds:
   esbuild: true
