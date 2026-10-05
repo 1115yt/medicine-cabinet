@@ -5,6 +5,7 @@ import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import app.medicinecabinet.CabinetApplication
+import app.medicinecabinet.BuildConfig
 import app.medicinecabinet.data.DisplayPreferences
 import app.medicinecabinet.data.LookupPreferences
 import app.medicinecabinet.data.ProductLookup
@@ -13,6 +14,7 @@ import app.medicinecabinet.data.BarcodeApiQueries
 import app.medicinecabinet.data.ServerCacheCredentials
 import app.medicinecabinet.data.ServerCacheWorker
 import app.medicinecabinet.data.ServerConnectionMonitor
+import app.medicinecabinet.data.ReleaseUpdateMonitor
 import app.medicinecabinet.domain.*
 import app.medicinecabinet.ui.forms.EditorRequest
 import app.medicinecabinet.reminders.ReminderScheduler
@@ -46,6 +48,11 @@ class CabinetViewModel(application: Application) : AndroidViewModel(application)
     val sharedStatus = productCache.shared.store.status
     private val sharedConnectionMonitor = ServerConnectionMonitor(viewModelScope, productCache.shared::checkConnection)
     val sharedConnection = sharedConnectionMonitor.status
+    private val releaseUpdateMonitor = ReleaseUpdateMonitor(viewModelScope) {
+        cabinetApplication.releaseUpdates.check(BuildConfig.VERSION_NAME)
+    }
+    val releaseUpdate = releaseUpdateMonitor.status
+    fun checkReleaseUpdate() = releaseUpdateMonitor.check()
     fun testSharedConnection() {
         val settings = sharedSettings.value
         if (settings.enabled && settings.available) sharedConnectionMonitor.check(settings.address)

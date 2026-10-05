@@ -8,6 +8,9 @@ import androidx.work.testing.WorkManagerTestInitHelper
 import app.medicinecabinet.reminders.ReminderWorker
 import app.medicinecabinet.data.CabinetDatabase
 import app.medicinecabinet.data.ServerCachePreferences
+import app.medicinecabinet.data.ReleaseUpdateSource
+import app.medicinecabinet.data.ReleaseUpdateResult
+import app.medicinecabinet.data.ReleaseUpdateReason
 import app.medicinecabinet.security.AesGcmCredentialCipher
 import javax.crypto.KeyGenerator
 
@@ -20,6 +23,16 @@ class TestCabinetApplication : CabinetApplication() {
     }
     // 全部界面测试禁用真实共享网络；共享行为另用模拟客户端单独核对。
     override val serverPreferences by lazy { ServerCachePreferences(this, featureEnabled = false) }
+    // 界面测试仅用可控制的模拟结果，绝不连接真实更新接口。
+    var updateProbe: suspend (String) -> ReleaseUpdateResult = {
+        ReleaseUpdateResult(ReleaseUpdateReason.NO_RELEASE)
+    }
+    var updateRequests = 0
+        private set
+    override val releaseUpdates = ReleaseUpdateSource { currentVersion ->
+        updateRequests++
+        updateProbe(currentVersion)
+    }
     // 每个测试独立持有内存药箱，避免页面测试之间带入之前的记录。
     override val database by lazy { Room.inMemoryDatabaseBuilder(this, CabinetDatabase::class.java).build() }
     override fun onCreate() {

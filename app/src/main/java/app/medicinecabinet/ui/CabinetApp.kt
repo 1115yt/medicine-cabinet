@@ -49,6 +49,7 @@ fun CabinetApp(viewModel: CabinetViewModel, shoppingRequest: Int = 0) {
     val sharedSettings by viewModel.sharedSettings.collectAsStateWithLifecycle()
     val sharedStatus by viewModel.sharedStatus.collectAsStateWithLifecycle()
     val sharedConnection by viewModel.sharedConnection.collectAsStateWithLifecycle()
+    val releaseUpdate by viewModel.releaseUpdate.collectAsStateWithLifecycle()
     val reminderHealth by viewModel.reminderHealth.collectAsStateWithLifecycle()
     val reminderHistory by viewModel.reminderHistory.collectAsStateWithLifecycle()
     val testNotification by viewModel.testNotification.collectAsStateWithLifecycle()
@@ -179,7 +180,8 @@ fun CabinetApp(viewModel: CabinetViewModel, shoppingRequest: Int = 0) {
                             apiUsage, checkingService, viewModel::testApiConnection,
                             sharedSettings, sharedStatus, viewModel::setSharedEnabled, viewModel::retrySharedUpload,
                             sharedConnection, viewModel::testSharedConnection, reminderHealth, reminderHistory,
-                            testNotification, viewModel::sendTestNotification, viewModel::checkRemindersNow)
+                            testNotification, viewModel::sendTestNotification, viewModel::checkRemindersNow,
+                            updateState = releaseUpdate, onCheckUpdate = viewModel::checkReleaseUpdate)
                     }
                     if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
                 }

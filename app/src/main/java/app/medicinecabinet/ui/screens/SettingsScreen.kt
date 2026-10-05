@@ -18,6 +18,7 @@ import app.medicinecabinet.data.ApiUsage
 import app.medicinecabinet.data.ServerCacheSettings
 import app.medicinecabinet.data.CacheSyncStatus
 import app.medicinecabinet.data.ServerConnectionState
+import app.medicinecabinet.data.ReleaseUpdateState
 import app.medicinecabinet.domain.BarcodeService
 import app.medicinecabinet.ui.components.*
 import app.medicinecabinet.ui.forms.InputField
@@ -38,7 +39,8 @@ fun SettingsScreen(settings: ReminderSettings, showExpiryDays: Boolean, interfac
     onSharedEnabled: (Boolean) -> Unit = {}, onRetryShared: () -> Unit = {},
     sharedConnection: ServerConnectionState = ServerConnectionState(), onCheckShared: () -> Unit = {},
     reminderHealth: ReminderHealth = ReminderHealth(), reminderHistory: ReminderHistory = ReminderHistory(),
-    testNotification: TestNotificationResult? = null, onTestNotification: () -> Unit = {}, onCheckReminders: () -> Unit = {}) {
+    testNotification: TestNotificationResult? = null, onTestNotification: () -> Unit = {}, onCheckReminders: () -> Unit = {},
+    updateState: ReleaseUpdateState = ReleaseUpdateState(), onCheckUpdate: () -> Unit = {}) {
     var days by rememberSaveable(settings.expiryLeadDays) { mutableStateOf(settings.expiryLeadDays.toString()) }
     var error by remember { mutableStateOf<String?>(null) }
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp, 16.dp, 20.dp, 40.dp),
@@ -118,6 +120,6 @@ fun SettingsScreen(settings: ReminderSettings, showExpiryDays: Boolean, interfac
                 }
             }
         }
-        item { AboutCard() }
+        item { AboutCard(updateState, onCheckUpdate) }
     }
 }

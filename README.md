@@ -11,6 +11,7 @@
 - 条码资料在设备本机查找。联网查询由用户自行配置认证；查询结果仍需按包装核对。
 - 可选共享条码身份资料。药箱库存、批次有效期、位置和 API 认证保存在本机，不上传到共享目录。
 - 通过 Android 系统文件选择器手动备份和恢复药箱。
+- 在设置中手动检查 GitHub 正式版本，有新版本时打开发布页面，由用户选择下载和安装。
 
 应用用于家庭记录，不提供诊断、剂量建议、药品真伪判断或购药服务。条码命中不代表官方核验结果。
 
@@ -21,11 +22,11 @@
 Android 本地构建与检查：
 
 ```bash
-./gradlew --no-daemon testDebugUnitTest lintDebug lintPreview lintRelease assemblePreview assembleRelease -PsplitApks=true
+./gradlew --no-daemon testDebugUnitTest lintDebug lintPreview lintRelease assembleRelease -PsplitApks=true
 ```
 
 ```powershell
-.\gradlew.bat --no-daemon testDebugUnitTest lintDebug lintPreview lintRelease assemblePreview assembleRelease -PsplitApks=true
+.\gradlew.bat --no-daemon testDebugUnitTest lintDebug lintPreview lintRelease assembleRelease -PsplitApks=true
 ```
 
 Cloudflare Worker 的本地测试：
@@ -45,6 +46,14 @@ pnpm test
 正式发布从 `v1.0.0` 开始，按 `v1.0.0 → … → v1.0.9 → v1.1.0` 进位；Android 内部 `versionCode` 持续递增。推送与 APK 版本一致的 `vX.Y.Z` 标签后，同样经过检查、签名和校验，再将安装包、SHA-256 校验值及构建信息发布到 [Releases](https://github.com/1115yt/medicine-cabinet/releases) 长期保存。标签对应提交必须在 `main` 历史内；已有版本的安装包不会自动覆盖。
 
 正式发行只提供固定签名的发行包。原预览版使用不同签名，切换前先导出药箱备份；同签名发行包之间可覆盖升级。Actions 工件与 Releases 附件均不包含发行私钥或密码。
+
+### 安装与检查更新
+
+正式版从 `1.0.0`（Android `versionCode 13`）开始。常见的 64 位 Android 手机可选择 `arm64-v8a.apk`；不确定架构时选择体积较大的 `universal.apk`。两个安装包功能和内置资料相同。
+
+“设置 → 检查更新”读取本仓库最新正式 Release。版本按数字逐段比较，只有正式版本和完整安装包均可用时才提示更新；没有发布记录、请求限流或网络失败会分别说明。点击“查看新版本”打开固定仓库的发布页面，不自动下载或安装。
+
+更新检查仅向 GitHub 公开接口发送一次无认证请求，不提交药箱记录、API 认证或共享访客令牌，也不计入条码 API 次数。GitHub 在部分网络环境下可能无法连接，可稍后重试或直接访问仓库 Releases。
 
 ## 资料来源与许可证
 

@@ -1,5 +1,6 @@
 package app.medicinecabinet.ui
 
+import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import androidx.activity.compose.setContent
@@ -13,20 +14,25 @@ import app.medicinecabinet.BuildConfig
 import app.medicinecabinet.CabinetApplication
 import app.medicinecabinet.MainActivity
 import app.medicinecabinet.TestCabinetApplication
+import app.medicinecabinet.data.ReleaseUpdateReason
+import app.medicinecabinet.data.ReleaseUpdateResult
 import app.medicinecabinet.domain.Medicine
 import app.medicinecabinet.domain.MedicineSort
 import app.medicinecabinet.domain.StockBatch
 import app.medicinecabinet.ui.theme.CabinetTheme
 import java.io.File
 import java.time.LocalDate
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.runBlocking
 import org.junit.*
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import org.robolectric.shadows.ShadowDialog
 
-/** 全部记录为内存示例；核对分类导航、排序选择与尚未开放的更新入口。 */
+/** 全部记录为内存示例，更新结果完全模拟；核对分类、排序和正式更新入口。 */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], qualifiers = "w393dp-h852dp-xhdpi", application = TestCabinetApplication::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -37,6 +43,7 @@ class ListingAndUpdatesUiTest {
 
     private val today get() = LocalDate.now()
     private val application get() = compose.activity.application as CabinetApplication
+    private val testApplication get() = application as TestCabinetApplication
     private val viewModel get() = ViewModelProvider(compose.activity)[CabinetViewModel::class.java]
 
     @Test fun `home opens matching categories expands only matching batches and preserves category after editing`() {
@@ -130,17 +137,87 @@ class ListingAndUpdatesUiTest {
         compose.onNodeWithText("乙药品示例").assertIsDisplayed()
     }
 
-    @Test fun `update entry displays current preview version and does not claim an online result`() {
-        compose.onNodeWithText("设置").performClick()
-        compose.onNode(hasScrollAction()).performScrollToNode(hasText("检查更新"))
-        compose.onNodeWithText("预览版暂未开放在线更新").assertIsDisplayed()
-        compose.onNodeWithContentDescription("打开作者 GitHub 主页").assertIsDisplayed()
-        compose.onNodeWithText("检查更新").performClick()
+    @Test fun `update check disables duplicate requests while waiting for the simulated result`() {
+        val pending = CompletableDeferred<ReleaseUpdateResult>()
+        testApplication.updateProbe = { pending.await() }
+        openUpdateDialog()
+        compose.waitUntil(20_000) { viewModel.releaseUpdate.value.checking && testApplication.updateRequests == 1 }
+        compose.onNodeWithText("正在检查正式版本，请稍候。").assertIsDisplayed()
+        compose.onNodeWithText("检查中").assertIsNotEnabled().performClick()
+        Assert.assertEquals(1, testApplication.updateRequests)
+        compose.onNodeWithText("稍后").performClick()
+        compose.onNodeWithText("正在检查").assertIsNotEnabled().performClick()
+        Assert.assertEquals(1, testApplication.updateRequests)
+        pending.complete(ReleaseUpdateResult(ReleaseUpdateReason.CURRENT))
+        awaitUpdateResult(ReleaseUpdateReason.CURRENT)
+        compose.onNodeWithText("检查更新").assertIsEnabled()
+    }
+
+    @Test fun `new release opens only the verified fixed GitHub version page`() {
+        val releaseUrl = "https://github.com/1115yt/medicine-cabinet/releases/tag/v1.0.1"
+        testApplication.updateProbe = { ReleaseUpdateResult(ReleaseUpdateReason.AVAILABLE, "1.0.1", releaseUrl, 200) }
+        openUpdateDialog()
+        awaitUpdateResult(ReleaseUpdateReason.AVAILABLE)
+        compose.onNodeWithText("发现新版本 1.0.1。", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("稍后").assertIsDisplayed()
+        compose.onNodeWithText("查看新版本").assertIsDisplayed().performClick()
+        val intent = Shadows.shadowOf(compose.activity).nextStartedActivity
+        Assert.assertEquals(Intent.ACTION_VIEW, intent.action)
+        Assert.assertEquals(releaseUrl, intent.data.toString())
+        Assert.assertEquals(1, testApplication.updateRequests)
+    }
+
+    @Test fun `current release shows a confirmed latest result and preserves the author mark`() {
+        testApplication.updateProbe = { ReleaseUpdateResult(ReleaseUpdateReason.CURRENT, BuildConfig.VERSION_NAME) }
+        openUpdateDialog()
+        awaitUpdateResult(ReleaseUpdateReason.CURRENT)
         compose.onNodeWithText("当前版本：${BuildConfig.VERSION_NAME}").assertIsDisplayed()
-        compose.onNodeWithText("当前使用预览版，暂未开放在线更新。正式版本发布后可在此检查。").assertIsDisplayed()
-        compose.onNodeWithText("已是最新版本").assertDoesNotExist()
+        compose.onNodeWithText("当前已是最新正式版本。").assertIsDisplayed()
+        compose.onNodeWithText("查看新版本").assertDoesNotExist()
         compose.onNodeWithText("知道了").performClick()
-        compose.onNodeWithText("当前版本：${BuildConfig.VERSION_NAME}").assertDoesNotExist()
+        compose.onNodeWithContentDescription("打开作者 GitHub 主页").assertIsDisplayed()
+        compose.onNodeWithText("预览版暂未开放在线更新").assertDoesNotExist()
+        Assert.assertEquals(1, testApplication.updateRequests)
+    }
+
+    @Test fun `missing formal release and missing APK are distinct from a current version`() {
+        openUpdateDialog()
+        awaitUpdateResult(ReleaseUpdateReason.NO_RELEASE)
+        compose.onNodeWithText("当前版本：${BuildConfig.VERSION_NAME}").assertIsDisplayed()
+        compose.onNodeWithText("暂未发布正式版本，请稍后再检查。").assertIsDisplayed()
+        compose.onNodeWithText("当前已是最新正式版本。").assertDoesNotExist()
+        compose.onNodeWithText("知道了").performClick()
+        testApplication.updateProbe = { ReleaseUpdateResult(ReleaseUpdateReason.NO_APK, "1.0.1") }
+        compose.onNodeWithText("检查更新").performClick()
+        awaitUpdateResult(ReleaseUpdateReason.NO_APK)
+        compose.onNodeWithText("最新正式版本尚无可下载安装包，请稍后再检查。").assertIsDisplayed()
+        compose.onNodeWithText("当前已是最新正式版本。").assertDoesNotExist()
+        compose.onNodeWithText("查看新版本").assertDoesNotExist()
+        Assert.assertEquals(2, testApplication.updateRequests)
+    }
+
+    @Test fun `failed check reports the failure and retries only after another tap`() {
+        testApplication.updateProbe = { ReleaseUpdateResult(ReleaseUpdateReason.TIMEOUT) }
+        openUpdateDialog()
+        awaitUpdateResult(ReleaseUpdateReason.TIMEOUT)
+        compose.onNodeWithText("检查更新超时，请检查网络后重试。").assertIsDisplayed()
+        compose.onNodeWithText("当前已是最新正式版本。").assertDoesNotExist()
+        Assert.assertEquals(1, testApplication.updateRequests)
+        testApplication.updateProbe = { ReleaseUpdateResult(ReleaseUpdateReason.CURRENT) }
+        compose.onNodeWithText("重试").assertIsEnabled().performClick()
+        awaitUpdateResult(ReleaseUpdateReason.CURRENT)
+        compose.onNodeWithText("当前已是最新正式版本。").assertIsDisplayed()
+        Assert.assertEquals(2, testApplication.updateRequests)
+    }
+
+    @Test fun `unsafe release address cannot open a browser from an available result`() {
+        testApplication.updateProbe = { ReleaseUpdateResult(ReleaseUpdateReason.AVAILABLE, "1.0.1",
+            "https://github.com.evil.invalid/1115yt/medicine-cabinet/releases/tag/v1.0.1") }
+        openUpdateDialog()
+        awaitUpdateResult(ReleaseUpdateReason.AVAILABLE)
+        compose.onNodeWithText("更新链接无效，暂时不能打开版本页面，请稍后重试。").assertIsDisplayed()
+        compose.onNodeWithText("查看新版本").assertDoesNotExist()
+        Assert.assertNull(Shadows.shadowOf(compose.activity).nextStartedActivity)
     }
 
     @Test fun `category and sorting remain readable in dark theme and large text`() {
@@ -181,11 +258,26 @@ class ListingAndUpdatesUiTest {
         chooseSort(MedicineSort.EXPIRY_FIRST)
         compose.onNodeWithText("快到期优先").assertIsDisplayed()
         capture("40-cabinet-sort-landscape")
-        compose.onNodeWithText("设置").performClick()
-        compose.onNode(hasScrollAction()).performScrollToNode(hasText("检查更新"))
-        compose.onNodeWithText("检查更新").performScrollTo().performClick()
-        compose.onNodeWithText("当前版本：${BuildConfig.VERSION_NAME}").assertIsDisplayed()
+        replaceTheme(dark = true, scale = 1.6f)
+        openUpdateDialog()
+        awaitUpdateResult(ReleaseUpdateReason.NO_RELEASE)
+        compose.onNodeWithText("当前版本：${BuildConfig.VERSION_NAME}").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("暂未发布正式版本，请稍后再检查。").performScrollTo().assertIsDisplayed()
+        capture("41-update-landscape-dark-large-text", dialog = true)
         compose.onNodeWithText("知道了").assertIsDisplayed().performClick()
+    }
+
+    private fun openUpdateDialog() {
+        compose.onNodeWithText("设置").performClick()
+        compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasText("检查更新"))
+        compose.onNodeWithText("检查更新").performScrollTo().performClick()
+    }
+
+    private fun awaitUpdateResult(reason: ReleaseUpdateReason) {
+        compose.waitUntil(20_000) {
+            !viewModel.releaseUpdate.value.checking && viewModel.releaseUpdate.value.result?.reason == reason
+        }
+        compose.waitForIdle()
     }
 
     private fun seedMixedBatches() {
@@ -231,12 +323,12 @@ class ListingAndUpdatesUiTest {
         compose.waitForIdle()
     }
 
-    private fun capture(name: String) {
+    private fun capture(name: String, dialog: Boolean = false) {
         compose.mainClock.advanceTimeBy(64)
         compose.waitForIdle()
         lateinit var bitmap: Bitmap
         compose.runOnUiThread {
-            val view = compose.activity.window.decorView
+            val view = if (dialog) ShadowDialog.getLatestDialog().window!!.decorView else compose.activity.window.decorView
             check(view.width > 0 && view.height > 0) { "预览窗口尚未布局。" }
             bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
             view.draw(Canvas(bitmap))

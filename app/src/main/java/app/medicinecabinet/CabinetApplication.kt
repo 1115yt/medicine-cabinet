@@ -10,6 +10,8 @@ import app.medicinecabinet.data.CombinedProductCache
 import app.medicinecabinet.data.ServerProductCache
 import app.medicinecabinet.data.ServerCachePreferences
 import app.medicinecabinet.data.ServerCacheWorker
+import app.medicinecabinet.data.GitHubReleaseUpdateClient
+import app.medicinecabinet.data.ReleaseUpdateSource
 import app.medicinecabinet.reminders.ReminderScheduler
 import app.medicinecabinet.reminders.ReminderDiagnostics
 import app.medicinecabinet.security.androidCredentialCipher
@@ -22,6 +24,8 @@ open class CabinetApplication : Application(), Configuration.Provider {
     val repository by lazy { CabinetRepository(database) }
     val reminderDiagnostics by lazy { ReminderDiagnostics(this) }
     open val credentialCipher by lazy { androidCredentialCipher() }
+    // 更新检查只读取仓库公开版本，与药箱和条码查询认证分开。
+    open val releaseUpdates: ReleaseUpdateSource by lazy { GitHubReleaseUpdateClient() }
     val catalog by lazy { BundledCatalog(assets) }
     open val serverPreferences by lazy { ServerCachePreferences(this) }
     open val productCache by lazy {

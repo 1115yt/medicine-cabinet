@@ -12,8 +12,8 @@ android {
         applicationId = "app.medicinecabinet"
         minSdk = 26
         targetSdk = 35
-        versionCode = 12
-        versionName = "0.1.11"
+        versionCode = 13
+        versionName = "1.0.0"
         // 服务地址是公开接口；部署验证完成后固化地址，管理员凭据不能进入 APK。
         val catalogAddress = providers.gradleProperty("catalogServerUrl")
             .orElse("https://medicine-api.eecld.icu").get()
